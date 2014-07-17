@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- 通用的Selector格式 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:drawable="@drawable/text_highlight_bg_normal" android:state_enabled="false"/>
+    <item android:drawable="@drawable/text_highlight_bg_normal" android:state_pressed="false"/>
+    
+    <item android:drawable="@drawable/text_highlight_bg_pressed" android:state_pressed="true"/>
+    <item android:drawable="@drawable/text_highlight_bg_pressed" android:state_checked="true"/>
+    <item android:drawable="@drawable/text_highlight_bg_pressed" android:state_enabled="true"/>
+
+</selector>
