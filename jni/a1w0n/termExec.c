@@ -33,6 +33,13 @@
 #include "termExec.h"
 #include "turbojpeg.h"
 
+// ====================================================
+// ====================================================
+// ndk-build 要用这个命令速度才能快起来：（用到Neon协处理器）
+//		ndk-build APP_ABI=armeabi-v7a LOCAL_ARM_MODE=arm LOCAL_ARM_NEON=true ARCH_ARM_HAVE_NEON=true
+// ====================================================
+// ====================================================
+
 static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 	/*
 	 * 像素偏移量计算公式
@@ -42,13 +49,9 @@ static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 	int fd, ret, byte_per_frame;
 	unsigned long	jpegSize = 0;
 	// 映射 /dev/graphics/fb0 内存地址
-	void	*framebuffer_memory;
+	unsigned char	*framebuffer_memory;
 	// 转换成 jpeg 数据后的地址
 	unsigned char* jpeg_data = NULL;
-
-	unsigned char* result = NULL;
-
-	bgra8888_t *fb_pixels = NULL;
 
 	static struct fb_var_screeninfo vinfo;
 	struct fb_fix_screeninfo finfo;
@@ -139,17 +142,7 @@ static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 	// 每屏数据的字节数
 	byte_per_frame = finfo.line_length * vinfo.yres;
 
-//	framebuffer_memory = (unsigned char*)mmap(
-//			0,
-//			byte_per_frame,
-//			PROT_READ,
-//			// 不要用MAP_PRIVATE
-//			MAP_SHARED,
-//			fd,
-//			// 假定xoffset为0
-//			finfo.line_length * vinfo.yoffset);
-
-	framebuffer_memory = (void*)mmap(
+	framebuffer_memory = (unsigned char*)mmap(
 			0,
 			byte_per_frame,
 			PROT_READ,
@@ -167,20 +160,16 @@ static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 
 	handle = tjInitCompress();
 
-	// 每四个像素，只取左上角的那个
-	jpeg_data = (unsigned char *) malloc(byte_per_frame / 4);
-	result = (unsigned char *) malloc(byte_per_frame / 4);
+	jpeg_data = (unsigned char *) malloc(byte_per_frame);
 
-	bgra_data_scale_quarter(framebuffer_memory, jpeg_data, byte_per_frame / 4, finfo.line_length / 4);
-
-//	tjCompress2(handle, jpeg_data,
-//			// 希望生成的jpeg图片的宽 源数据里头屏幕每行的字节数
-//			640, finfo.line_length,
-//			// 希望生成的jpeg图片的高
-//			360, TJPF_BGRA,
-//			&result, &jpegSize,
-//			TJSAMP_444, 10,
-//			TJFLAG_NOREALLOC);
+	tjCompress2(handle, framebuffer_memory,
+			// 希望生成的jpeg图片的宽 源数据里头屏幕每行的字节数
+			1280, finfo.line_length,
+			// 希望生成的jpeg图片的高
+			720, TJPF_BGRA,
+			&jpeg_data, &jpegSize,
+			TJSAMP_444, 10,
+			TJFLAG_NOREALLOC);
 	LOGD("Turbo-jpeg compress fb0 done!");
 
 	// 释放资源
@@ -190,40 +179,13 @@ static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 			ba,
 			0,
 			jpegSize,
-			(jbyte*)result);
+			(jbyte*)jpeg_data);
 
 	tjFree(jpeg_data);
-	tjFree(result);
 	close(fd);
 	tjDestroy(handle);
 
 	return jpegSize;
-}
-
-/**
- * 横向和竖向都每两行取一行像素值，也就是图像大小缩小到原来的四分之一
- */
-int bgra_data_scale_quarter(const void* src, unsigned char* dst, size_t pixels, size_t row_pixels)
-{
-    bgra8888_t  *from;
-    bgra8888_t  *to;
-
-    from = (bgra8888_t *) src;
-    to = (bgra8888_t *) dst;
-
-    size_t i = 0;
-    size_t current_row = 0;
-    size_t index_in_dst = 0;
-    /* traverse pixel of the row */
-    while(i++ < pixels) {
-    	current_row = i / row_pixels;
-    	if (i % 2 == 1 || current_row % 2 == 1) continue;
-
-    	to[index_in_dst] = from[i];
-    	index_in_dst++;
-    }
-
-    return 0;
 }
 
 static const char *classPathName = "com/a1w0n/standard/Jni/Exec";
