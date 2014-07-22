@@ -23,6 +23,7 @@
 #include <time.h>
 #include <linux/kd.h>
 #include <linux/fb.h>
+#include <stddef.h>
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
@@ -33,12 +34,39 @@
 #include "termExec.h"
 #include "turbojpeg.h"
 
+typedef unsigned char uint8;
+#define MEMACCESS(base) "%%nacl:(%%r15,%q" #base ")"
+
 // ====================================================
 // ====================================================
 // ndk-build 要用这个命令速度才能快起来：（用到Neon协处理器）
 //		ndk-build APP_ABI=armeabi-v7a LOCAL_ARM_MODE=arm LOCAL_ARM_NEON=true ARCH_ARM_HAVE_NEON=true
 // ====================================================
 // ====================================================
+
+//void ScaleRowDown2_NEON(const uint8* src_ptr, uint8* dst, int dst_width) {
+//  __asm__ volatile (
+//    ".p2align   2                              \n"
+//	"1:                                          \n"
+//    // load even pixels into q0, odd into q1
+//    // 一次性 load 两字节到 q0 q1
+//    "vld2.8     {q0, q1}, [%0]!                \n"
+//    // dst_width -= 16;
+//    "subs       %2, %2, #16                    \n"  // 2 bytes processed per loop
+//    // 把 q1 保存到 dst
+//    "vst1.8     {q1}, [%1]!                    \n"  // store odd pixels
+//    "bgt        1b                             \n"
+//  : "+r"(src_ptr),          // %0
+//    "+r"(dst),              // %1
+//    "+r"(dst_width)         // %2
+//  :
+//  : "q0", "q1"              // Clobber List
+//  );
+//}
+//
+//static void socket_Test() {
+//
+//}
 
 static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 	/*
@@ -162,14 +190,17 @@ static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 
 	jpeg_data = (unsigned char *) malloc(byte_per_frame);
 
+//	ScaleRowDown2_NEON(framebuffer_memory, jpeg_data, byte_per_frame * 8);
+
 	tjCompress2(handle, framebuffer_memory,
 			// 希望生成的jpeg图片的宽 源数据里头屏幕每行的字节数
-			1280, finfo.line_length,
+			vinfo.xres, finfo.line_length,
 			// 希望生成的jpeg图片的高
-			720, TJPF_BGRA,
+			vinfo.yres, TJPF_BGRA,
 			&jpeg_data, &jpegSize,
-			TJSAMP_444, 10,
+			TJSAMP_444, 50,
 			TJFLAG_NOREALLOC);
+
 	LOGD("Turbo-jpeg compress fb0 done!");
 
 	// 释放资源
@@ -181,7 +212,7 @@ static int android_os_Exec_test(JNIEnv *env, jobject clazz, jbyteArray ba) {
 			jpegSize,
 			(jbyte*)jpeg_data);
 
-	tjFree(jpeg_data);
+	free(jpeg_data);
 	close(fd);
 	tjDestroy(handle);
 

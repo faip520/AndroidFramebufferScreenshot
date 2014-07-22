@@ -21,7 +21,7 @@ import android.widget.ImageView;
 import com.A1w0n.androidcommonutils.CMDUtils;
 import com.A1w0n.androidcommonutils.IOUtils.IOUtils;
 import com.A1w0n.androidcommonutils.bitmaputils.BitmapUtils;
-import com.a1w0n.standard.DebugUtils.Logger;
+import com.A1w0n.androidcommonutils.debugutils.Logger;
 import com.a1w0n.standard.Jni.Exec;
 
 public class MainActivity extends FragmentActivity {
@@ -54,12 +54,21 @@ public class MainActivity extends FragmentActivity {
 	        final View view = inflater.inflate(R.layout.fragment_main, null);
 	        mImageView = (ImageView) view.findViewById(R.id.Reset);
 	        
+	        CMDUtils.runWithRoot("chmod 777 /dev/graphics/fb0");
+	        
 	        mImageView.postDelayed(new Runnable() {
 				@Override
 				public void run() {
+					// Change size on your demand.
 			        byte[] aa = new byte[1280 * 720 * 4];
 			        long start = System.currentTimeMillis();
 			        int bb = Exec.test(aa);
+			        
+			        if (bb == -1) {
+						Logger.e("Error happened in jni!");
+						return;
+					}
+			        
 			        Logger.d("Time = " + (System.currentTimeMillis() - start));
 			        
 			        if (aa != null) {
@@ -72,7 +81,6 @@ public class MainActivity extends FragmentActivity {
 							Logger.d("bitmap == null");
 						}
 					}
-					
 					
 //					CMDUtils.runWithoutRoot("a1w0n -c \"pm install /mnt/sdcard/temp.apk\"");
 				}
