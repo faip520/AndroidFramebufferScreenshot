@@ -2,6 +2,8 @@ AndroidFramebufferScreenshot
 ============================
 Take screenshot in jni, return byte array to java, decode and display in ImageView.
 
+Only works in rooted devices!
+
 
 
 Performance
